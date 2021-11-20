@@ -2,6 +2,7 @@ use crate::rule::*;
 use prettytable::{Row, Table};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 const NTERM_RE_EXPR: &str = r"[A-Z]'?";
 const ALPHA_RE_EXPR: &str = r"\+|\-|\*|/|\(|\)|num";
@@ -235,6 +236,40 @@ impl Parser {
         }
     }
 
+    pub fn print_action(&self) {
+        let mut table_t = Table::new();
+        const HEAD: [&str; 9] = ["", "+", "-", "*", "/", "(", ")", "num", "$"];
+        table_t.add_row(Row::from(HEAD));
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        for _ in 0..self.closures.len() {
+            rows.push(vec!["".to_string(); HEAD.len()]);
+        }
+        for (key, action) in &self.action {
+            let i = key.0;
+            let row = rows.get_mut(i).unwrap();
+            let column_symbol = &key.1;
+            let column_index = HEAD
+                .iter()
+                .position(|t| {
+                    if let Symbol::Terminal(i) = column_symbol {
+                        return i == t;
+                    } else {
+                        false
+                    }
+                })
+                .unwrap();
+            row[column_index] = format!("{}", action);
+        }
+        for (i, row) in rows.iter().enumerate() {
+            let mut row = row.clone();
+            row[0] = i.to_string();
+            table_t.add_row(Row::from(row));
+        }
+        table_t.printstd();
+    }
+
+    pub fn print_goto(&self) {}
+
     pub fn parse(&mut self) {
         println!("1. 拓广文法：");
         self.list_rules();
@@ -250,5 +285,26 @@ impl Parser {
         );
         println!("4. 构造LR(1)分析表");
         self.get_action();
+        println!("4.1. 表action");
+        self.print_action();
+        println!("4.2. 表goto");
+        self.print_goto();
+    }
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Action::Shift(i) => {
+                write!(f, "S{}", i);
+            }
+            Action::Reduce(r) => {
+                write!(f, "R{}", r);
+            }
+            Action::Acc => {
+                write!(f, "ACC");
+            }
+        }
+        Ok(())
     }
 }
