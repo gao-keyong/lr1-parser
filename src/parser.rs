@@ -268,7 +268,29 @@ impl Parser {
         table_t.printstd();
     }
 
-    pub fn print_goto(&self) {}
+    pub fn print_goto(&self) {
+        let mut table_t = Table::new();
+        let head: Vec<_> = self.nt_set.iter().collect();
+        let mut head_row: Vec<_> = head.iter().map(|s| s.to_string()).collect();
+        head_row.insert(0, "".to_string());
+        table_t.add_row(Row::from(head_row));
+        for i in 0..self.closures.len() {
+            let mut row: Vec<String> = vec![i.to_string()];
+            for s in &head {
+                let goto = self.goto.get(&(i, Symbol::Nonterminal(s.to_string())));
+                match goto {
+                    Some(j) => {
+                        row.push(j.to_string());
+                    }
+                    None => {
+                        row.push("".to_string());
+                    }
+                }
+            }
+            table_t.add_row(Row::from(row));
+        }
+        table_t.printstd();
+    }
 
     pub fn parse(&mut self) {
         println!("1. 拓广文法：");
