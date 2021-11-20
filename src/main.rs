@@ -3,8 +3,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 struct Opt {
-    /// 需要分析的表达式
-    #[structopt(help = "Expression to be parsed")]
+    #[structopt(help = "需要分析的表达式")]
     expr: String,
 }
 
