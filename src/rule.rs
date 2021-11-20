@@ -15,6 +15,7 @@ impl Symbol {
     }
 }
 
+#[derive(Clone,Eq,PartialEq,Hash)]
 pub struct Rule {
     pub lhs: Symbol,
     pub rhs: Vec<Symbol>,

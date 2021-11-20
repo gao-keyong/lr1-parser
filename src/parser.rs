@@ -6,12 +6,19 @@ use std::collections::{HashMap, HashSet};
 const NTERM_RE_EXPR: &str = r"[A-Z]'?";
 const ALPHA_RE_EXPR: &str = r"\+|\-|\*|/|\(|\)|num";
 
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct Item(pub Rule, pub usize, pub Symbol);
+
+type Closure = HashSet<Item>;
+
 pub struct Parser {
     rules: Vec<Rule>,
     start_symbol: Symbol,
     nt_set: HashSet<Symbol>,
     alpha_re: Regex,
     first: HashMap<Symbol, HashSet<Symbol>>,
+    closures: Vec<Closure>,
+    goto: HashMap<(usize, Symbol), usize>,
 }
 
 impl Parser {
@@ -22,6 +29,8 @@ impl Parser {
             nt_set: HashSet::new(),
             alpha_re: Regex::new(ALPHA_RE_EXPR).unwrap(),
             first: HashMap::new(),
+            closures: Vec::new(),
+            goto: HashMap::new(),
         }
     }
 
@@ -99,12 +108,105 @@ impl Parser {
         table_t.printstd();
     }
 
+    fn compute_closure(&self, kernel: Closure) -> Closure {
+        let mut closure = kernel;
+
+        loop {
+            let prev_closure = closure.clone();
+            for item in &prev_closure {
+                match item.0.rhs.get(item.1) {
+                    None => (),
+                    Some(s) => {
+                        if matches!(s, Symbol::Nonterminal(_)) {
+                            let lookaheads = match item.0.rhs.get(item.1 + 1) {
+                                None => vec![item.2.clone()],
+                                Some(f) => {
+                                    if matches!(f, Symbol::Nonterminal(_)) {
+                                        self.first.get(f).unwrap().clone().into_iter().collect()
+                                    } else {
+                                        vec![f.clone()]
+                                    }
+                                }
+                            };
+                            for rule in &self.rules {
+                                if &rule.lhs == s {
+                                    for lookahead in &lookaheads {
+                                        closure.insert(Item(rule.clone(), 0, lookahead.clone()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if prev_closure == closure {
+                break;
+            }
+        }
+        closure
+    }
+
+    fn get_dfa(&mut self) {
+        let mut start_cluster = Closure::new();
+        start_cluster.insert(Item(
+            self.rules.get(0).unwrap().clone(),
+            0,
+            Symbol::Terminal("$".to_string()),
+        ));
+        let start_cluster = self.compute_closure(start_cluster);
+        self.closures.push(start_cluster);
+
+        let mut index: usize = 0;
+        while index < self.closures.len() {
+            let edges: HashSet<Symbol> = self.closures[index]
+                .iter()
+                .filter_map(|item| item.0.rhs.get(item.1))
+                .map(|s| s.clone())
+                .collect();
+
+            for edge in edges {
+                let kernel: Closure = self.closures[index]
+                    .iter()
+                    .filter(|item| {
+                        if let Some(s) = item.0.rhs.get(item.1) {
+                            if s == &edge {
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                    .cloned()
+                    .map(|item| Item(item.0, item.1 + 1, item.2))
+                    .collect();
+
+                let closure = self.compute_closure(kernel);
+
+                match self.closures.iter().position(|c| c == &closure) {
+                    None => {
+                        self.closures.push(closure);
+                        self.goto
+                            .insert((index, edge.clone()), self.closures.len() - 1);
+                    }
+                    Some(pos) => {
+                        self.goto.insert((index, edge.clone()), pos);
+                    }
+                }
+            }
+            index += 1;
+        }
+    }
+
     pub fn parse(&mut self) {
         println!("1. 拓广文法：");
         self.list_rules();
         println!("2. 计算FIRST集合：");
         self.get_first();
         self.print_first();
-        println!("3. 计算LR(1)项目集规范族和go(I,X)转移函数：")
+        println!("3. 计算LR(1)项目集规范族和go(I,X)转移函数：");
+        self.get_dfa();
+        println!("LR(1)项目集规范族共有{}个", self.closures.len());
     }
 }
