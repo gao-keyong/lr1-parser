@@ -11,6 +11,13 @@ pub struct Item(pub Rule, pub usize, pub Symbol);
 
 type Closure = HashSet<Item>;
 
+#[derive(Debug)]
+enum Action {
+    Shift(usize),
+    Reduce(usize),
+    Acc,
+}
+
 pub struct Parser {
     rules: Vec<Rule>,
     start_symbol: Symbol,
@@ -19,6 +26,7 @@ pub struct Parser {
     first: HashMap<Symbol, HashSet<Symbol>>,
     closures: Vec<Closure>,
     goto: HashMap<(usize, Symbol), usize>,
+    action: HashMap<(usize, Symbol), Action>,
 }
 
 impl Parser {
@@ -31,6 +39,7 @@ impl Parser {
             first: HashMap::new(),
             closures: Vec::new(),
             goto: HashMap::new(),
+            action: HashMap::new(),
         }
     }
 
@@ -199,6 +208,33 @@ impl Parser {
         }
     }
 
+    fn get_action(&mut self) {
+        for (i, closure) in self.closures.iter().enumerate() {
+            for item in closure {
+                match item.0.rhs.get(item.1) {
+                    Some(s) => {
+                        if matches!(s, Symbol::Terminal(_)) {
+                            self.action
+                                .insert((i, s.clone()), Action::Shift(self.goto[&(i, s.clone())]));
+                        }
+                    }
+                    None => {
+                        if item.0.lhs == self.start_symbol {
+                            self.action.insert((i, item.2.clone()), Action::Acc);
+                        } else {
+                            self.action.insert(
+                                (i, item.2.clone()),
+                                Action::Reduce(
+                                    self.rules.iter().position(|r| r == &item.0).unwrap(),
+                                ),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn parse(&mut self) {
         println!("1. 拓广文法：");
         self.list_rules();
@@ -207,6 +243,12 @@ impl Parser {
         self.print_first();
         println!("3. 计算LR(1)项目集规范族和go(I,X)转移函数：");
         self.get_dfa();
-        println!("LR(1)项目集规范族共有{}个", self.closures.len());
+        println!(
+            "LR(1)项目集规范族共有{}个，DFA的转移边有{}条。",
+            self.closures.len(),
+            self.goto.len()
+        );
+        println!("4. 构造LR(1)分析表");
+        self.get_action();
     }
 }

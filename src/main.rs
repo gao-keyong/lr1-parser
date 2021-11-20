@@ -1,7 +1,7 @@
 use lr1_parser::parser;
 
 fn main() {
-    let mut parser = parser::Parser::new("E");
+    let mut parser = parser::Parser::new("E'");
     parser.add_rule("E'", "E");
     parser.add_rule("E", "E+T");
     parser.add_rule("E", "E-T");
