@@ -292,7 +292,7 @@ impl Parser {
         table_t.printstd();
     }
 
-    pub fn parse(&mut self) {
+    pub fn parse(&mut self, expr: &str) {
         println!("1. 拓广文法：");
         self.list_rules();
         println!("2. 计算FIRST集合：");
@@ -311,6 +311,88 @@ impl Parser {
         self.print_action();
         println!("4.2. 表goto");
         self.print_goto();
+
+        println!("5. 根据分析表对输入的表达式进行分析：");
+        let mut input = expr.to_string() + "$";
+        let num_re = Regex::new(r"[1-9]\d*(\.\d+)?").unwrap();
+        let letter_re = Regex::new(r"num|\+|\-|\*|/|\(|\)|\$").unwrap();
+        input = num_re.replace_all(&input, "num").to_string();
+        let mut state_stack = vec![0 as usize];
+        let mut symbol_stack: Vec<Symbol> = vec![];
+        let mut table_t = Table::new();
+        table_t.add_row(Row::from(["状态栈", "符号栈", "输入", "分析动作"]));
+        loop {
+            // println!("{:?} | {:?}",stack,input);
+            let cell_state_stack: String = state_stack
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join(" ");
+            let cell_symbol_stack: String = symbol_stack
+                .iter()
+                .map(|s| match s {
+                    Symbol::Terminal(t) => t.clone(),
+                    Symbol::Nonterminal(n) => n.clone(),
+                })
+                .collect::<Vec<String>>()
+                .join(" ");
+            let cell_input: String = input.clone();
+            let cell_output: String;
+            let s = state_stack.last().unwrap();
+            let s = s.clone();
+            let a = letter_re.captures(&input).unwrap().get(0).unwrap().as_str();
+            let a = Symbol::Terminal(a.to_string());
+            let action = self.action.get(&(s, a.clone()));
+            // println!("{}:{}", s, a);
+            match action {
+                Some(action) => match action {
+                    Action::Shift(state) => {
+                        state_stack.push(state.to_owned());
+                        symbol_stack.push(a.clone());
+                        input = input[a.to_string().len()..].to_string();
+                        cell_output = "Shift".to_string() + &state.to_string();
+                    }
+                    Action::Reduce(r) => {
+                        let reduce_rule = self.rules.get(*r).unwrap();
+                        for _ in 0..reduce_rule.rhs.len() {
+                            if let None = state_stack.pop() {
+                                panic!("输入不匹配");
+                            }
+                            if let None = symbol_stack.pop() {
+                                panic!("输入不匹配");
+                            }
+                        }
+                        let s = state_stack.last();
+                        if let None = s {
+                            panic!("输入不匹配");
+                        }
+                        let s = s.unwrap().clone();
+                        let next_state = self.goto[&(s, reduce_rule.lhs.clone())];
+                        symbol_stack.push(reduce_rule.lhs.clone());
+                        state_stack.push(next_state);
+                        cell_output = format!("reduce by {}", reduce_rule);
+                    }
+                    Action::Acc => {
+                        cell_output = "ACC".to_string();
+                        let row = Row::from([
+                            cell_state_stack,
+                            cell_symbol_stack,
+                            cell_input,
+                            cell_output,
+                        ]);
+                        table_t.add_row(row);
+                        table_t.printstd();
+                        break;
+                    }
+                },
+                None => {
+                    panic!("输入不匹配");
+                }
+            }
+            // println!("{:?}{:?}{:?}", state_stack, symbol_stack, input);
+            let row = Row::from([cell_state_stack, cell_symbol_stack, cell_input, cell_output]);
+            table_t.add_row(row);
+        }
     }
 }
 

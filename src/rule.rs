@@ -15,7 +15,7 @@ impl Symbol {
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Rule {
     pub lhs: Symbol,
     pub rhs: Vec<Symbol>,
@@ -30,21 +30,27 @@ impl Rule {
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Symbol::Nonterminal(s) => write!(f, "{}", s),
+            Symbol::Nonterminal(s) => {
+                write!(f, "{}", s);
+            }
             Symbol::Terminal(s) => {
                 if s.is_empty() {
-                    write!(f, "ε")
+                    write!(f, "ε");
                 } else {
-                    write!(f, "{}", s)
+                    write!(f, "{}", s);
                 }
             }
         }
+        Ok(())
     }
 }
 
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}->", self.lhs);
+        if self.rhs.is_empty() {
+            write!(f, "ε");
+        }
         for s in &self.rhs {
             write!(f, "{}", s);
         }
